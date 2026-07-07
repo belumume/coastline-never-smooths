@@ -1,6 +1,9 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
+#     "matplotlib>=3.11.0",
+#     "numpy>=2.5.1",
+#     "torch>=2.12.1",
 #     "wigglystuff==0.5.13",
 # ]
 # ///
@@ -10,8 +13,6 @@ import marimo
 __generated_with = "0.23.9"
 app = marimo.App(
     width="medium",
-    css_file="/usr/local/_marimo/custom.css",
-    auto_download=["html"],
 )
 
 
@@ -56,7 +57,7 @@ def imports():
     return ChartPuck, dataclasses, np, plt, torch
 
 
-@app.cell
+@app.cell(hide_code=True)
 def engine(dataclasses, np, torch):
     # Fractal-trainability engine - faithful torch port of Sohl-Dickstein's
     # reference implementation (github.com/Sohl-Dickstein/fractal, MIT),
@@ -460,7 +461,7 @@ def zoom_ui(
 
     zoom_choice = mo.ui.dropdown(
         options=list(ZOOM_ROUTE.keys()),
-        value="full map",
+        value="zoom 1: the rough coast",
         label="guided route",
     )
     lr1_range = mo.ui.range_slider(
@@ -742,7 +743,7 @@ def anchor_display(
 @app.cell(hide_code=True)
 def anchor_caption(mo):
     mo.md(r"""
-    A note on the rare disagreement: right on the knife edge, the replay can land on the opposite side from its own pixel. Both compute the same trajectory in fp32, but the map batches 262,144 runs and the replay runs one, so their floating-point additions happen in different orders. Away from the boundary that difference changes nothing. On it, a rounding-error-sized nudge can decide the fate of the run. Finding such a point is not a bug to hide; it is the sharpest demonstration this notebook has of what a chaotic boundary means.
+    A note on the rare disagreement: right on the knife edge, the replay can land on the opposite side from its own pixel. Both compute the same trajectory in fp32, but the map batches 262,144 runs and the replay runs one, so their floating-point additions happen in different orders. Away from the boundary that difference changes nothing. On it, a rounding-error-sized nudge can decide the fate of the run. Finding such a point is the sharpest demonstration this notebook has of what a chaotic boundary means.
     """)
     return
 
@@ -927,11 +928,11 @@ def verdict(mo):
 
     Three findings, each computed live in this notebook:
 
-    1. **The boundary is fractal.** The border between trainable and divergent does not smooth under magnification. Its box-counting dimension stays well above 1.0 at every depth on the guided route, reaching about 1.9 in the deepest window, where a smooth curve would read 1.0.
+    1. **The boundary is fractal.** The border between trainable and divergent does not smooth under magnification. Averaged over the whole map, the boundary's box-counting dimension measures about 1.19 at section 3's resolution; zoom into the roughest stretches and the local dimension climbs, reaching about 1.9 in the guided route's deepest window. A smooth curve would read 1.0 at every scale, everywhere. (Those are two views of one object: the global figure averages long tame stretches of coast with the wild ones; the zoom measures the wild ones up close.)
     2. **You can feel why.** Park the replay puck on the coastline and the loss curve hesitates for hundreds of steps before committing. The chaos that lets two touching pixels end on opposite shores is the same sensitivity that carves the border into a fractal.
     3. **Noise sands it, but does not erase it.** Give every pixel its own minibatch schedule and the crisp coastline becomes a probability band. Its dimension drops from the deterministic 1.19 to a plateau near 1.10 and holds there: real training noise removes the sharpest filigree and leaves a residual roughness that never becomes a smooth curve.
 
-    The practical reading: near the edge of trainability there is no tidy threshold to memorize. The edge is not a line you can tune against. It is a coastline.
+    The practical reading: near the edge of trainability there is no tidy threshold to memorize. The edge of trainability is a coastline.
     """)
     return
 
@@ -957,6 +958,13 @@ def calibration(boxcount_dimension, extract_edges, mo, np):
 
     _smooth = extract_edges(np.fromfunction(lambda i, j: (i - 0.4 * j - 200.0), (_n, _n)))
 
+    # a CURVED smooth boundary (circle): dimension must still read 1.0
+    _circle = extract_edges(
+        np.fromfunction(
+            lambda i, j: ((i - 364.0) ** 2 + (j - 364.0) ** 2 - 220.0**2), (_n, _n)
+        )
+    )
+
 
     def _carpet(k):
         m = np.ones((1, 1), bool)
@@ -969,7 +977,8 @@ def calibration(boxcount_dimension, extract_edges, mo, np):
     _rng_cal = np.random.default_rng(0)
     _cases = [
         ("straight line", 1.0, _line),
-        ("smooth boundary", 1.0, _smooth),
+        ("smooth straight boundary", 1.0, _smooth),
+        ("smooth curved boundary (circle)", 1.0, _circle),
         ("Sierpinski carpet", 1.893, _carpet(6)),
         ("random mask", 2.0, _rng_cal.random((_n, _n)) < 0.5),
     ]
@@ -989,8 +998,8 @@ def methods(mo):
 
     - **Paper:** Jascha Sohl-Dickstein, *The boundary of neural network trainability is fractal*, arXiv 2402.06184 (2024).
     - **Reference implementation:** the author's public notebook (MIT license) defines the network, the signed convergence measure, and the rank-based color normalization used here. This notebook reimplements them in PyTorch and was validated against the author's canonical rendering before anything else was built. The author also rendered one minibatch variant (a single schedule shared across the map); the ensemble treatment in section 3 is this notebook's addition.
-    - **Compute:** every map is computed in this notebook's own runtime. The full map is 262,144 independent training runs; a typical session of this notebook trains several million tiny networks. The core reproduction also runs on CPU (smaller grids); the GPU earns its keep in section 3, where the schedule ensembles multiply the work by an order of magnitude.
-    - **Honesty notes:** dimension estimates are resolution- and step-budget-dependent, so every comparison here holds those fixed; the calibration table above bounds estimator error at about one percent on known shapes; section 3's ensemble size is stated next to every number it affects.
+    - **Compute:** sections 1 and 2 are computed live in this notebook's own runtime, GPU when attached: the full map is 262,144 independent training runs, and every zoom retrains its window from scratch. Section 3 replays a one-time GPU ensemble sweep (48 independent schedules at each of 6 batch sizes, run once and embedded) so the notebook stays self-contained and loads instantly. The core reproduction also runs on CPU with smaller grids.
+    - **Honesty notes:** dimension estimates are resolution- and step-budget-dependent, so every comparison here holds those fixed. Two kinds of dimension appear in this notebook: the whole-map boundary (about 1.19 at section 3's resolution, an average over calm and wild stretches alike) and local window dimensions from section 2's zooms (up to about 1.9 in the roughest coves); neither contradicts the other. The calibration table above bounds estimator error at about one percent on known shapes; section 3's ensemble size is stated next to every number it affects.
     """)
     return
 
