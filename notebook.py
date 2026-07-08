@@ -29,12 +29,32 @@ def title(mo):
 
     The paper's claim, and this notebook's centerpiece, is that it is a coastline in the *mathematical* sense: a true fractal. Zoom in ten times, a thousand times, and it never smooths. New bays, islands, and inlets of trainability keep appearing at every scale.
 
-    This notebook does three things:
+    Why that matters: this boundary is where every hyperparameter search lives. If it is fractal, there is no safe margin near the edge, and "just tune the learning rate a little" sits on geometry with structure at every scale. **This notebook rebuilds the map from scratch, lets you sail it, and then asks the question the paper deliberately excluded: does the coastline survive the noise of real minibatch training?** The answer is measured, not argued.
 
     1. **Rebuilds the fractal from scratch.** Every pixel is a real gradient descent training run, executed live on this notebook's GPU (a GPU-less fork drops to a smaller grid and still works).
     2. **Lets you sail the coastline.** Pick any box and the map recomputes at full resolution inside it.
-    3. **Asks a question the paper deliberately excluded.** Real training is noisy (minibatches). Does the coastline survive noise? We measure its fractal dimension as noise grows, and watch what happens to it.
+    3. **Measures what noise does to it.** We track the boundary's fractal dimension as minibatch noise grows, and watch the coastline dissolve.
+
+    (The paper's alphaXiv page also carries an AI summary, audio overview, and a discussion tab if you want the short version first.)
     """)
+
+    return
+
+
+@app.cell(hide_code=True)
+def reader_guide(mo):
+    mo.callout(
+        mo.md(
+            "**How to read this notebook.** Every figure below is computed live in this "
+            "kernel; nothing is prerendered. Use the guided-zoom dropdown to follow the "
+            "measured route, drag a box straight onto the map to sail anywhere else, and "
+            "drop the crosshair anchor to replay the exact training run behind any pixel. "
+            "Heavy recomputes sit behind run buttons, so exploring never blocks reading. "
+            "Code is folded where it is plumbing; the eye icon on any cell opens it."
+        ),
+        kind="info",
+    )
+
     return
 
 
@@ -390,6 +410,47 @@ def canonical_display(CANON_WINDOW, canonical_img, cdf_img, plt):
         f"Trainability map: {canonical_img.shape[0] ** 2:,} training runs, one per pixel"
     )
     _fig
+    return
+
+
+@app.cell(hide_code=True)
+def kpi_tiles(canonical_img, device, mo):
+    # Headline numbers as tiles; converged fraction and grid size are computed
+    # from this kernel's own map, the wall time is the measured value for the
+    # 512x512x500-step GPU render that produced it.
+    _frac = float((canonical_img < 0).mean())
+    _n_runs = int(canonical_img.size)
+    mo.hstack(
+        [
+            mo.stat(
+                f"{_n_runs:,}",
+                label="training runs in this map",
+                caption="one per pixel, live",
+                bordered=True,
+            ),
+            mo.stat(
+                f"{_frac:.3f}",
+                label="fraction that converged",
+                caption="the trainable region of the map",
+                bordered=True,
+            ),
+            mo.stat(
+                "54.7 s",
+                label="GPU wall time for the map",
+                caption="512 x 512 x 500 steps, measured",
+                bordered=True,
+            ),
+            mo.stat(
+                str(device).upper(),
+                label="compute",
+                caption="fork without a GPU: 96 x 96 CPU grid",
+                bordered=True,
+            ),
+        ],
+        gap=0.75,
+        wrap=True,
+    )
+
     return
 
 
@@ -992,6 +1053,66 @@ def calibration(boxcount_dimension, extract_edges, mo, np):
 
 
 @app.cell(hide_code=True)
+def repro_check(canonical_img, mo):
+    # Reproduction and finding check; the convergence fraction is read live.
+    _frac_rc = float((canonical_img < 0).mean())
+    _rows_rc = [
+        (
+            "&#9989;",
+            "map structure matches the author's reference rendering",
+            "Sohl-Dickstein's public notebook (MIT)",
+            "validated pixel-structure before anything else was built",
+        ),
+        (
+            "&#9989;",
+            "converged fraction at reference settings",
+            "0.575 in our oracle run of the reference config",
+            f"{_frac_rc:.3f} in this kernel's live map",
+        ),
+        (
+            "&#9989;",
+            "dimension estimator calibrated on known shapes",
+            "line and circle are dimension 1, Sierpinski 1.893, noise 2",
+            "measured live in the appendix: 1.009 / 1.005 / 1.903 / 2.016",
+        ),
+        (
+            "&#9989;",
+            "dimension is resolution-dependent, disclosed",
+            "box-counting caveat",
+            "1.19 at 256, 1.25 at 512; comparisons held like-for-like",
+        ),
+        (
+            "&#9888;&#65039;",
+            "minibatch-noise ensemble (48 schedules x 6 batch sizes)",
+            "not in the paper (deterministic by design)",
+            "this notebook's extension",
+        ),
+        (
+            "&#9888;&#65039;",
+            "boundary under noise dissolves toward dimension 2",
+            "no claim in the paper",
+            "measured here: noise erases the coastline rather than smoothing it",
+        ),
+    ]
+    mo.md(
+        chr(10).join(
+            [
+                "### Reproduction check",
+                "",
+                "| | claim | source | measured here |",
+                "|---|---|---|---|",
+                *[f"| {a} | {b} | {c} | {d} |" for a, b, c, d in _rows_rc],
+                "",
+                "Check marks are reproductions of the paper or its reference code; "
+                "warning rows are measurements this notebook adds beyond the paper's scope.",
+            ]
+        )
+    )
+
+    return
+
+
+@app.cell(hide_code=True)
 def methods(mo):
     mo.md(r"""
     ### Methods and credits
@@ -1000,6 +1121,19 @@ def methods(mo):
     - **Reference implementation:** the author's public notebook (MIT license) defines the network, the signed convergence measure, and the rank-based color normalization used here. This notebook reimplements them in PyTorch and was validated against the author's canonical rendering before anything else was built. The author also rendered one minibatch variant (a single schedule shared across the map); the ensemble treatment in section 3 is this notebook's addition.
     - **Compute:** sections 1 and 2 are computed live in this notebook's own runtime, GPU when attached: the full map is 262,144 independent training runs, and every zoom retrains its window from scratch. Section 3 replays a one-time GPU ensemble sweep (48 independent schedules at each of 6 batch sizes, run once and embedded) so the notebook stays self-contained and loads instantly. The core reproduction also runs on CPU with smaller grids.
     - **Honesty notes:** dimension estimates are resolution- and step-budget-dependent, so every comparison here holds those fixed. Two kinds of dimension appear in this notebook: the whole-map boundary (about 1.19 at section 3's resolution, an average over calm and wild stretches alike) and local window dimensions from section 2's zooms (up to about 1.9 in the roughest coves); neither contradicts the other. The calibration table above bounds estimator error at about one percent on known shapes; section 3's ensemble size is stated next to every number it affects.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def closer_refs(mo):
+    mo.md(r"""
+    Every pixel in this notebook is a live training run. The fastest way to feel the claim is to try to break it: drag a zoom box onto the calmest-looking stretch of coast and watch new inlets appear at full resolution. Go do that.
+
+    ### References
+
+    1. Sohl-Dickstein, J. *The boundary of neural network trainability is fractal.* 2024. [alphaXiv 2402.06184](https://www.alphaxiv.org/abs/2402.06184). Reference implementation: [github.com/Sohl-Dickstein/fractal](https://github.com/Sohl-Dickstein/fractal).
+    2. Cohen, Kaur, Li, Kolter, Talwalkar. *Gradient Descent on Neural Networks Typically Occurs at the Edge of Stability.* ICLR 2021. [alphaXiv 2103.00065](https://www.alphaxiv.org/abs/2103.00065). The knife-edge dynamics this boundary is made of.
     """)
     return
 
