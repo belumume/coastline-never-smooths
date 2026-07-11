@@ -1,18 +1,21 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "matplotlib>=3.11.0",
-#     "numpy>=2.5.1",
-#     "torch>=2.12.1",
+#     "marimo>=0.23.14",
+#     "matplotlib==3.11.0",
+#     "numpy==2.4.6",
+#     "torch==2.11.0",
 #     "wigglystuff==0.5.13",
 # ]
 # ///
 
 import marimo
 
-__generated_with = "0.23.9"
+__generated_with = "0.23.14"
 app = marimo.App(
     width="medium",
+    css_file="/usr/local/_marimo/custom.css",
+    auto_download=["html"],
 )
 
 
@@ -37,7 +40,6 @@ def title(mo):
 
     (The paper's alphaXiv page also carries an AI summary, audio overview, and a discussion tab if you want the short version first.)
     """)
-
     return
 
 
@@ -54,18 +56,17 @@ def reader_guide(mo):
         ),
         kind="info",
     )
-
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def mo_import():
     import marimo as mo
 
     return (mo,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def imports():
     import dataclasses
 
@@ -366,7 +367,7 @@ def sec1_intro(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def canonical_compute(Config, compute_grid, np, torch):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     cfg = Config(steps=500)
@@ -390,7 +391,7 @@ def canonical_compute(Config, compute_grid, np, torch):
     return CANON_WINDOW, canonical_img, cfg, device, zoom_res
 
 
-@app.cell
+@app.cell(hide_code=True)
 def canonical_display(CANON_WINDOW, canonical_img, cdf_img, plt):
     _disp = cdf_img(canonical_img)
     _fig, _ax = plt.subplots(figsize=(8, 8))
@@ -450,7 +451,6 @@ def kpi_tiles(canonical_img, device, mo):
         gap=0.75,
         wrap=True,
     )
-
     return
 
 
@@ -476,7 +476,7 @@ def sec2_intro(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def zoom_route():
     # The guided route: windows chosen by measured boundary density on the
     # canonical map (sliding-window edge count, see appendix). Each window nests
@@ -490,7 +490,7 @@ def zoom_route():
     return (ZOOM_ROUTE,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def zoom_ui(
     CANON_WINDOW,
     ZOOM_ROUTE,
@@ -558,7 +558,7 @@ def zoom_ui(
     return free_go, lr1_range, lr2_range, zoom_choice, zoom_select
 
 
-@app.cell
+@app.cell(hide_code=True)
 def zoom_compute(
     ZOOM_ROUTE,
     cfg,
@@ -627,7 +627,7 @@ def zoom_compute(
     return zoom_img, zoom_window
 
 
-@app.cell
+@app.cell(hide_code=True)
 def zoom_display(
     CANON_WINDOW,
     boxcount_dimension,
@@ -708,7 +708,7 @@ def anchor_intro(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def anchor_widget(CANON_WINDOW, ChartPuck, canonical_img, cdf_img, mo, plt):
     # Drag-me map: a wigglystuff ChartPuck overlaid on the canonical map.
     # throttle=150 ms keeps the replay smooth while dragging.
@@ -731,7 +731,7 @@ def anchor_widget(CANON_WINDOW, ChartPuck, canonical_img, cdf_img, mo, plt):
     return (puck,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def anchor_trace(CANON_WINDOW, canonical_img, cfg, device, loss_trace, puck):
     # Replay the training run at the puck's position. loss_trace mirrors
     # convergence_grid with G=1, so this is the pixel's actual biography,
@@ -762,7 +762,7 @@ def anchor_trace(CANON_WINDOW, canonical_img, cfg, device, loss_trace, puck):
     return map_converged, puck_lr, trace_converged, trace_v
 
 
-@app.cell
+@app.cell(hide_code=True)
 def anchor_display(
     map_converged,
     mo,
@@ -823,7 +823,7 @@ def sec3_intro(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def batch_slider(mo):
     batch_pick = mo.ui.slider(
         steps=[8, 16, 32, 64, 136, 272],
@@ -860,7 +860,7 @@ def sec3_data(np):
     return DIM_ROWS, NOISE_K, det_dim, det_noise_img, p_field
 
 
-@app.cell
+@app.cell(hide_code=True)
 def pfield_display(
     CANON_WINDOW,
     NOISE_K,
@@ -926,7 +926,7 @@ def pfield_display(
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def dim_curve(DIM_ROWS, det_dim, plt):
     _figD, _axD = plt.subplots(figsize=(9, 5.5))
     _bss = [r[0] for r in DIM_ROWS]
@@ -1008,7 +1008,7 @@ def appendix_intro(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def calibration(boxcount_dimension, extract_edges, mo, np):
     # Calibration of the box-counting estimator on known-dimension shapes.
     _n = 729
@@ -1089,9 +1089,9 @@ def repro_check(canonical_img, mo):
         ),
         (
             "&#9888;&#65039;",
-            "boundary under noise dissolves toward dimension 2",
+            "boundary under an independent-noise ensemble erodes but does not smooth",
             "no claim in the paper",
-            "measured here: noise erases the coastline rather than smoothing it",
+            "measured here: dimension drops from 1.19 to a plateau near 1.10 and holds, not toward 2 (partial erosion; residual roughness survives)",
         ),
     ]
     mo.md(
@@ -1108,6 +1108,7 @@ def repro_check(canonical_img, mo):
             ]
         )
     )
+    # repro row corrected 2026-07-11
 
     return
 
