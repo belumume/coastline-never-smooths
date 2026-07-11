@@ -14,8 +14,6 @@ import marimo
 __generated_with = "0.23.14"
 app = marimo.App(
     width="medium",
-    css_file="/usr/local/_marimo/custom.css",
-    auto_download=["html"],
 )
 
 
