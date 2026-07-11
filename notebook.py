@@ -1129,6 +1129,24 @@ def closer_refs(mo):
     mo.md(r"""
     Every pixel in this notebook is a live training run. The fastest way to feel the claim is to try to break it: drag a zoom box onto the calmest-looking stretch of coast and watch new inlets appear at full resolution. Go do that.
 
+
+    ### Three edges of stability
+
+    This notebook is one of three, each built on a different paper, each a view of
+    the same edge.
+
+    - **The Coastline That Never Smooths** (you are here). The boundary between
+      networks that train and networks that blow up is fractal, and noise only
+      sands it down. It never goes flat.
+    - **[On the Wire](https://molab.marimo.io/notebooks/nb_QtxPsWxaZSpnRU2J8qWZWm)**. Training does not politely avoid that boundary. It
+      climbs until sharpness pins at 2/eta and rides there while the loss keeps
+      falling, and minibatch noise eventually blows it off the wire.
+    - **[The Scale DyT Forgot](https://molab.marimo.io/notebooks/nb_jNm948dpXRCvrK9demdeaf)**. Replace LayerNorm with a frozen learned
+      scalar and you pin where that boundary sits relative to your input scale.
+      Move the scale, and the network falls off an edge it can no longer feel.
+
+    The map, the ride, and the calibration. One edge, three ways to fall off it.
+
     ### References
 
     1. Sohl-Dickstein, J. *The boundary of neural network trainability is fractal.* 2024. [alphaXiv 2402.06184](https://www.alphaxiv.org/abs/2402.06184). Reference implementation: [github.com/Sohl-Dickstein/fractal](https://github.com/Sohl-Dickstein/fractal).
